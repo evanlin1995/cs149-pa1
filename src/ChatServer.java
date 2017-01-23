@@ -30,6 +30,8 @@ public class ChatServer {
         = Pattern.compile("POST /([\\p{Alnum}]*)/?pull\\?last=([0-9]+) HTTP.*");
     private static final Pattern PUSH_REQUEST
         = Pattern.compile("POST /([\\p{Alnum}]*)/?push\\?msg=([^ ]*) HTTP.*");
+    
+    private static final int NUM_THREADS = 8;
 
     private static final String CHAT_HTML;
     static {
@@ -43,6 +45,9 @@ public class ChatServer {
     private final int port;
     private final Map<String,ChatState> stateByName
         = new HashMap<String,ChatState>();
+    
+    
+    private ThreadPool pool;
 
     /**
      * Constructs a new {@link ChatServer} that will service requests
@@ -51,14 +56,33 @@ public class ChatServer {
      */
     public ChatServer(final int port) throws IOException {
         this.port = port;
+        pool = new ThreadPool(NUM_THREADS);
+    }
+    
+    public class ConnectionTask implements Runnable {
+    	
+    	Socket connection;
+    	
+    	public ConnectionTask(Socket connection) {
+    		this.connection = connection;
+    	}
+    	
+    	public void run() {
+    		try {
+    			handle(connection);
+    		} catch (IOException e) {
+    			System.err.println(e);
+    		}
+    	}
+    	
     }
 
     public void runForever() throws IOException {
         @SuppressWarnings("resource")
 		final ServerSocket server = new ServerSocket(port);
         while (true) {
-            final Socket connection = server.accept();
-            handle(connection);
+            final Socket connection = server.accept();         
+            pool.runTask(new ConnectionTask(connection));
         }
     }
     
