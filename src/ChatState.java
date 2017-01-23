@@ -8,6 +8,9 @@ public class ChatState {
     private final String name;
     private final LinkedList<String> history = new LinkedList<String>();
     private long lastID = System.currentTimeMillis();
+    
+    private int numReadThreads = 0;
+    private final Object readLock = new Object();
 
     public ChatState(final String name) {
         this.name = name;
@@ -34,11 +37,21 @@ public class ChatState {
      * messages.
      */
     public void addMessage(final String msg) {
-        history.addLast(msg);
-        ++lastID;
-        if (history.size() > MAX_HISTORY) {
-            history.removeFirst();
-        }
+    	synchronized(history) {
+    		synchronized(readLock) {
+    	        history.addLast(msg);
+    	        ++lastID;
+    	        if (history.size() > MAX_HISTORY) {
+    	            history.removeFirst();
+    	        }
+    	        readLock.notifyAll();
+            	try {
+            		readLock.wait();
+            	} catch (InterruptedException e) {
+            		System.err.println(e);
+            	}			
+    		}
+    	}
     }
 
     /**
@@ -67,25 +80,40 @@ public class ChatState {
      * wait even after messages have been posted.
      */
     public String recentMessages(long mostRecentSeenID) {
-        int count = messagesToSend(mostRecentSeenID);
-        if (count == 0) {
-            // TODO: Do not use Thread.sleep() here!
-            try {
-                Thread.sleep(15000);
-            } catch (final InterruptedException xx) {
-                throw new Error("unexpected", xx);
+ 
+    	final StringBuffer buf = new StringBuffer();
+        
+        synchronized(readLock) {
+        	int count = messagesToSend(mostRecentSeenID);
+        	numReadThreads++;
+            if (count == 0) {
+                // TODO: Do not use Thread.sleep() here!
+//                try {
+//                    Thread.sleep(15000);
+//                } catch (final InterruptedException xx) {
+//                    throw new Error("unexpected", xx);
+//                }
+            	try {
+            		readLock.wait();
+            	} catch (InterruptedException e) {
+            		System.err.println(e);
+            	}
+            	
+                count = messagesToSend(mostRecentSeenID);
             }
-            count = messagesToSend(mostRecentSeenID);
-        }
-
-        final StringBuffer buf = new StringBuffer();
-
-        // If count == 1, then id should be lastID on the first
-        // iteration.
-        long id = lastID - count + 1;
-        for (String msg: history.subList(history.size() - count, history.size())) {
-            buf.append(id).append(": ").append(msg).append('\n');
-            ++id;
+            numReadThreads--;
+            
+            
+            // If count == 1, then id should be lastID on the first
+            // iteration.
+            long id = lastID - count + 1;
+            for (String msg: history.subList(history.size() - count, history.size())) {
+                buf.append(id).append(": ").append(msg).append('\n');
+                ++id;
+            }
+            
+            if (numReadThreads == 0) readLock.notify();
+               	
         }
         return buf.toString();
     }
