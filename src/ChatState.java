@@ -9,9 +9,6 @@ public class ChatState {
     private final LinkedList<String> history = new LinkedList<String>();
     private long lastID = System.currentTimeMillis();
     
-    private int numReadThreads = 0;
-    private final Object readLock = new Object();
-
     public ChatState(final String name) {
         this.name = name;
         history.addLast("Hello " + name + "!");
@@ -38,19 +35,12 @@ public class ChatState {
      */
     public void addMessage(final String msg) {
     	synchronized(history) {
-//    		synchronized(readLock) {
 	        history.addLast(msg);
 	        ++lastID;
 	        if (history.size() > MAX_HISTORY) {
 	            history.removeFirst();
 	        }
 	        history.notifyAll();
-//        	try {
-//        		readLock.wait();
-//        	} catch (InterruptedException e) {
-//        		System.err.println(e);
-//        	}			
-//    		}
     	}
     }
 
@@ -85,14 +75,7 @@ public class ChatState {
         
         synchronized(history) {
         	int count = messagesToSend(mostRecentSeenID);
-//        	numReadThreads++;
             if (count == 0) {
-                // TODO: Do not use Thread.sleep() here!
-//                try {
-//                    Thread.sleep(15000);
-//                } catch (final InterruptedException xx) {
-//                    throw new Error("unexpected", xx);
-//                }
             	try {
             		history.wait(15000);
             	} catch (InterruptedException e) {
@@ -101,9 +84,7 @@ public class ChatState {
             	
                 count = messagesToSend(mostRecentSeenID);
             }
-//            numReadThreads--;
-//            
-            
+
             // If count == 1, then id should be lastID on the first
             // iteration.
             long id = lastID - count + 1;
@@ -112,8 +93,7 @@ public class ChatState {
                 ++id;
             }
             
-//            if (numReadThreads == 0) readLock.notify();
-               	
+
         }
         return buf.toString();
     }
