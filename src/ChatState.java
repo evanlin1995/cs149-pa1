@@ -38,19 +38,19 @@ public class ChatState {
      */
     public void addMessage(final String msg) {
     	synchronized(history) {
-    		synchronized(readLock) {
-    	        history.addLast(msg);
-    	        ++lastID;
-    	        if (history.size() > MAX_HISTORY) {
-    	            history.removeFirst();
-    	        }
-    	        readLock.notifyAll();
-            	try {
-            		readLock.wait();
-            	} catch (InterruptedException e) {
-            		System.err.println(e);
-            	}			
-    		}
+//    		synchronized(readLock) {
+	        history.addLast(msg);
+	        ++lastID;
+	        if (history.size() > MAX_HISTORY) {
+	            history.removeFirst();
+	        }
+	        history.notifyAll();
+//        	try {
+//        		readLock.wait();
+//        	} catch (InterruptedException e) {
+//        		System.err.println(e);
+//        	}			
+//    		}
     	}
     }
 
@@ -83,9 +83,9 @@ public class ChatState {
  
     	final StringBuffer buf = new StringBuffer();
         
-        synchronized(readLock) {
+        synchronized(history) {
         	int count = messagesToSend(mostRecentSeenID);
-        	numReadThreads++;
+//        	numReadThreads++;
             if (count == 0) {
                 // TODO: Do not use Thread.sleep() here!
 //                try {
@@ -94,15 +94,15 @@ public class ChatState {
 //                    throw new Error("unexpected", xx);
 //                }
             	try {
-            		readLock.wait();
+            		history.wait(15000);
             	} catch (InterruptedException e) {
             		System.err.println(e);
             	}
             	
                 count = messagesToSend(mostRecentSeenID);
             }
-            numReadThreads--;
-            
+//            numReadThreads--;
+//            
             
             // If count == 1, then id should be lastID on the first
             // iteration.
@@ -112,7 +112,7 @@ public class ChatState {
                 ++id;
             }
             
-            if (numReadThreads == 0) readLock.notify();
+//            if (numReadThreads == 0) readLock.notify();
                	
         }
         return buf.toString();
