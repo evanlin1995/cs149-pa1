@@ -92,9 +92,8 @@ public class ChatState {
                 buf.append(id).append(": ").append(msg).append('\n');
                 ++id;
             }
-            
-
         }
+        
         return buf.toString();
     }
 }
